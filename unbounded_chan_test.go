@@ -7,10 +7,10 @@ import (
 )
 
 func TestMakeUnboundedChan(t *testing.T) {
-	in, out := MakeUnboundedChan(100)
+	ch := NewUnboundedChan(100)
 
 	for i := 1; i < 200; i++ {
-		in <- int64(i)
+		ch.In <- int64(i)
 	}
 
 	var count int64
@@ -19,7 +19,7 @@ func TestMakeUnboundedChan(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		for v := range out {
+		for v := range ch.Out {
 			count += v.(int64)
 		}
 
@@ -27,9 +27,9 @@ func TestMakeUnboundedChan(t *testing.T) {
 	}()
 
 	for i := 200; i <= 1000; i++ {
-		in <- int64(i)
+		ch.In <- int64(i)
 	}
-	close(in)
+	close(ch.In)
 
 	wg.Wait()
 

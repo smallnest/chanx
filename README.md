@@ -14,18 +14,18 @@ Refer to the below articles and issues:
 ## Usage
 
 ```go
-in, out := MakeUnboundedChan(1000)
+ch := NewUnboundedChan(1000)
 
 go func() {
     ...
-    in <- ...
+    ch.In <- ... // send values
     ...
 
-    close(in)
+    close(ch.In) // close In channel
 }()
 
 
-for v := range out {
+for v := range ch.Out { // read values
     fmt.Println(v)
 }
 
