@@ -1,13 +1,16 @@
 package chanx
 
+// T defines interface{}, and will be used for generic type after go 1.18 is released.
+type T interface{}
+
 // UnboundedChan is an unbounded chan.
 // In is used to write without blocking, which supports multiple writers.
 // and Out is used to read, wich supports multiple readers.
 // You can close the in channel if you want.
 type UnboundedChan struct {
-	In     chan<- interface{} // channel for write
-	Out    <-chan interface{} // channel for read
-	buffer []interface{}      // buffer
+	In     chan<- T // channel for write
+	Out    <-chan T // channel for read
+	buffer []T      // buffer
 }
 
 // Len returns len of Out plus len of buffer.
@@ -25,9 +28,9 @@ func (c UnboundedChan) BufLen() int {
 // and out is used to read, wich supports multiple readers.
 // You can close the in channel if you want.
 func NewUnboundedChan(initCapacity int) UnboundedChan {
-	in := make(chan interface{}, initCapacity)
-	out := make(chan interface{}, initCapacity)
-	ch := UnboundedChan{In: in, Out: out, buffer: make([]interface{}, 0, initCapacity)}
+	in := make(chan T, initCapacity)
+	out := make(chan T, initCapacity)
+	ch := UnboundedChan{In: in, Out: out, buffer: make([]T, 0, initCapacity)}
 
 	go func() {
 		defer close(out)
@@ -58,7 +61,7 @@ func NewUnboundedChan(initCapacity int) UnboundedChan {
 				case out <- ch.buffer[0]:
 					ch.buffer = ch.buffer[1:]
 					if len(ch.buffer) == 0 { // after burst
-						ch.buffer = make([]interface{}, 0, initCapacity)
+						ch.buffer = make([]T, 0, initCapacity)
 						ch.buffer = ch.buffer
 					}
 				}
