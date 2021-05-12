@@ -62,7 +62,6 @@ func NewUnboundedChan(initCapacity int) UnboundedChan {
 					ch.buffer = ch.buffer[1:]
 					if len(ch.buffer) == 0 { // after burst
 						ch.buffer = make([]T, 0, initCapacity)
-						ch.buffer = ch.buffer
 					}
 				}
 			}
