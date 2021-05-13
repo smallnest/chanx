@@ -1,7 +1,6 @@
 package chanx
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 )
@@ -22,8 +21,6 @@ func TestMakeUnboundedChan(t *testing.T) {
 		for v := range ch.Out {
 			count += v.(int64)
 		}
-
-		fmt.Println("read completed")
 	}()
 
 	for i := 200; i <= 1000; i++ {

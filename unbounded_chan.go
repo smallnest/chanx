@@ -8,19 +8,19 @@ type T interface{}
 // and Out is used to read, wich supports multiple readers.
 // You can close the in channel if you want.
 type UnboundedChan struct {
-	In     chan<- T // channel for write
-	Out    <-chan T // channel for read
-	buffer []T      // buffer
+	In     chan<- T    // channel for write
+	Out    <-chan T    // channel for read
+	buffer *RingBuffer // buffer
 }
 
 // Len returns len of Out plus len of buffer.
 func (c UnboundedChan) Len() int {
-	return len(c.buffer) + len(c.Out)
+	return c.buffer.Len() + len(c.Out)
 }
 
 // BufLen returns len of the buffer.
 func (c UnboundedChan) BufLen() int {
-	return len(c.buffer)
+	return c.buffer.Len()
 }
 
 // NewUnboundedChan creates the unbounded chan.
@@ -30,7 +30,7 @@ func (c UnboundedChan) BufLen() int {
 func NewUnboundedChan(initCapacity int) UnboundedChan {
 	in := make(chan T, initCapacity)
 	out := make(chan T, initCapacity)
-	ch := UnboundedChan{In: in, Out: out, buffer: make([]T, 0, initCapacity)}
+	ch := UnboundedChan{In: in, Out: out, buffer: NewRingBuffer(initCapacity)}
 
 	go func() {
 		defer close(out)
@@ -49,29 +49,30 @@ func NewUnboundedChan(initCapacity int) UnboundedChan {
 			}
 
 			// out is full
-			ch.buffer = append(ch.buffer, val)
-			for len(ch.buffer) > 0 {
+			ch.buffer.Write(val)
+			for !ch.buffer.IsEmpty() {
 				select {
 				case val, ok := <-in:
 					if !ok { // in is closed
 						break loop
 					}
-					ch.buffer = append(ch.buffer, val)
+					ch.buffer.Write(val)
 
-				case out <- ch.buffer[0]:
-					ch.buffer = ch.buffer[1:]
-					if len(ch.buffer) == 0 { // after burst
-						ch.buffer = make([]T, 0, initCapacity)
+				case out <- ch.buffer.Peek():
+					ch.buffer.Pop()
+					if ch.buffer.IsEmpty() { // after burst
+						ch.buffer.Reset()
 					}
 				}
 			}
 		}
 
 		// drain
-		for len(ch.buffer) > 0 {
-			out <- ch.buffer[0]
-			ch.buffer = ch.buffer[1:]
+		for !ch.buffer.IsEmpty() {
+			out <- ch.buffer.Pop()
 		}
+
+		ch.buffer.Reset()
 	}()
 
 	return ch
