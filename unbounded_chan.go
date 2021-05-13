@@ -5,7 +5,7 @@ type T interface{}
 
 // UnboundedChan is an unbounded chan.
 // In is used to write without blocking, which supports multiple writers.
-// and Out is used to read, wich supports multiple readers.
+// and Out is used to read, which supports multiple readers.
 // You can close the in channel if you want.
 type UnboundedChan struct {
 	In     chan<- T    // channel for write
@@ -25,7 +25,7 @@ func (c UnboundedChan) BufLen() int {
 
 // NewUnboundedChan creates the unbounded chan.
 // in is used to write without blocking, which supports multiple writers.
-// and out is used to read, wich supports multiple readers.
+// and out is used to read, which supports multiple readers.
 // You can close the in channel if you want.
 func NewUnboundedChan(initCapacity int) UnboundedChan {
 	in := make(chan T, initCapacity)
