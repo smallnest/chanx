@@ -60,7 +60,7 @@ func NewUnboundedChan(initCapacity int) UnboundedChan {
 
 				case out <- ch.buffer.Peek():
 					ch.buffer.Pop()
-					if ch.buffer.IsEmpty() { // after burst
+					if ch.buffer.IsEmpty() && ch.buffer.size > ch.buffer.initialSize { // after burst
 						ch.buffer.Reset()
 					}
 				}

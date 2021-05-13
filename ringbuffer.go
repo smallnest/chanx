@@ -40,14 +40,9 @@ func (r *RingBuffer) Read() (T, error) {
 }
 
 func (r *RingBuffer) Pop() T {
-	if r.r == r.w { // Empty
+	v, err := r.Read()
+	if err == ErrIsEmpty { // Empty
 		panic(ErrIsEmpty.Error())
-	}
-
-	v := r.buf[r.r]
-	r.r++
-	if r.r == r.size {
-		r.r = 0
 	}
 
 	return v
