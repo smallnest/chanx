@@ -18,6 +18,14 @@ type RingBuffer struct {
 }
 
 func NewRingBuffer(initialSize int) *RingBuffer {
+	if initialSize <= 0 {
+		panic("initial size must be great than zero")
+	}
+	// initial size must >= 2
+	if initialSize == 1 {
+		initialSize = 2
+	}
+
 	return &RingBuffer{
 		buf:         make([]T, initialSize),
 		initialSize: initialSize,
@@ -71,7 +79,13 @@ func (r *RingBuffer) Write(v T) {
 }
 
 func (r *RingBuffer) grow() {
-	size := r.size + r.size/4
+	var size int
+	if r.size < 1024 {
+		size = r.size * 2
+	} else {
+		size = r.size + r.size/4
+	}
+
 	buf := make([]T, size)
 
 	copy(buf[0:], r.buf[r.r:])
