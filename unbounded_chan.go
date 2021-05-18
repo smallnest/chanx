@@ -28,13 +28,7 @@ func (c UnboundedChan) BufLen() int {
 // and out is used to read, which supports multiple readers.
 // You can close the in channel if you want.
 func NewUnboundedChan(initCapacity int) UnboundedChan {
-	in := make(chan T, initCapacity)
-	out := make(chan T, initCapacity)
-	ch := UnboundedChan{In: in, Out: out, buffer: NewRingBuffer(initCapacity)}
-
-	go process(in, out, ch)
-
-	return ch
+	return NewUnboundedChanSize(initCapacity, initCapacity, initCapacity)
 }
 
 // NewUnboundedChanSize is like NewUnboundedChan but you can set initial capacity for In, Out, Buffer.
