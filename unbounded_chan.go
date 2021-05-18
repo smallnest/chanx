@@ -32,48 +32,61 @@ func NewUnboundedChan(initCapacity int) UnboundedChan {
 	out := make(chan T, initCapacity)
 	ch := UnboundedChan{In: in, Out: out, buffer: NewRingBuffer(initCapacity)}
 
-	go func() {
-		defer close(out)
-	loop:
-		for {
-			val, ok := <-in
-			if !ok { // in is closed
-				break loop
-			}
+	go process(in, out, ch)
 
-			// out is not full
+	return ch
+}
+
+// NewUnboundedChanSize is like NewUnboundedChan but you can set initial capacity for In, Out, Buffer.
+func NewUnboundedChanSize(initInCapacity, initOutCapacity, initBufCapacity int) UnboundedChan {
+	in := make(chan T, initInCapacity)
+	out := make(chan T, initOutCapacity)
+	ch := UnboundedChan{In: in, Out: out, buffer: NewRingBuffer(initBufCapacity)}
+
+	go process(in, out, ch)
+
+	return ch
+}
+
+func process(in, out chan T, ch UnboundedChan) {
+	defer close(out)
+loop:
+	for {
+		val, ok := <-in
+		if !ok { // in is closed
+			break loop
+		}
+
+		// out is not full
+		select {
+		case out <- val:
+			continue
+		default:
+		}
+
+		// out is full
+		ch.buffer.Write(val)
+		for !ch.buffer.IsEmpty() {
 			select {
-			case out <- val:
-				continue
-			default:
-			}
+			case val, ok := <-in:
+				if !ok { // in is closed
+					break loop
+				}
+				ch.buffer.Write(val)
 
-			// out is full
-			ch.buffer.Write(val)
-			for !ch.buffer.IsEmpty() {
-				select {
-				case val, ok := <-in:
-					if !ok { // in is closed
-						break loop
-					}
-					ch.buffer.Write(val)
-
-				case out <- ch.buffer.Peek():
-					ch.buffer.Pop()
-					if ch.buffer.IsEmpty() && ch.buffer.size > ch.buffer.initialSize { // after burst
-						ch.buffer.Reset()
-					}
+			case out <- ch.buffer.Peek():
+				ch.buffer.Pop()
+				if ch.buffer.IsEmpty() && ch.buffer.size > ch.buffer.initialSize { // after burst
+					ch.buffer.Reset()
 				}
 			}
 		}
+	}
 
-		// drain
-		for !ch.buffer.IsEmpty() {
-			out <- ch.buffer.Pop()
-		}
+	// drain
+	for !ch.buffer.IsEmpty() {
+		out <- ch.buffer.Pop()
+	}
 
-		ch.buffer.Reset()
-	}()
-
-	return ch
+	ch.buffer.Reset()
 }

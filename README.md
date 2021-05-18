@@ -1,6 +1,6 @@
 # chanx
 
-Unbounded chan.
+Unbounded chan with ringbuffer.
 
 [![License](https://img.shields.io/:license-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![GoDoc](https://godoc.org/github.com/smallnest/chanx?status.png)](http://godoc.org/github.com/smallnest/chanx)  [![travis](https://travis-ci.org/smallnest/chanx.svg?branch=main)](https://travis-ci.org/smallnest/chanx) [![Go Report Card](https://goreportcard.com/badge/github.com/smallnest/chanx)](https://goreportcard.com/report/github.com/smallnest/chanx) [![coveralls](https://coveralls.io/repos/smallnest/chanx/badge.svg?branch=main&service=github)](https://coveralls.io/github/smallnest/chanx?branch=main) 
 
@@ -15,11 +15,14 @@ Refer to the below articles and issues:
 
 ```go
 ch := NewUnboundedChan(1000)
+// or ch := NewUnboundedChanSize(10,200,1000)
 
 go func() {
-    ...
-    ch.In <- ... // send values
-    ...
+    for ...... {
+        ...
+        ch.In <- ... // send values
+        ...
+    }
 
     close(ch.In) // close In channel
 }()
