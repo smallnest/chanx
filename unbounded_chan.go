@@ -13,9 +13,9 @@ type UnboundedChan struct {
 	buffer *RingBuffer // buffer
 }
 
-// Len returns len of Out plus len of buffer.
+// Len returns len of In plus len of Out plus len of buffer.
 func (c UnboundedChan) Len() int {
-	return c.buffer.Len() + len(c.Out)
+	return len(c.In) + c.buffer.Len() + len(c.Out)
 }
 
 // BufLen returns len of the buffer.
