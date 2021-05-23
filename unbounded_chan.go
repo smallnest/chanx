@@ -76,6 +76,11 @@ loop:
 			}
 		}
 	}
+	
+	// drain 
+	for val := range in {
+		out <- val
+	}
 
 	// drain
 	for !ch.buffer.IsEmpty() {
