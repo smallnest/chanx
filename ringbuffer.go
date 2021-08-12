@@ -8,7 +8,7 @@ var ErrIsEmpty = errors.New("ringbuffer is empty")
 
 // RingBuffer is a ring buffer for common types.
 // It never is full and always grows if it will be full.
-// It is not thread-safe(goroutine-safe) so you must use Lock to use it in multiple writers and multiple readers.
+// It is not thread-safe(goroutine-safe) so you must use the lock-like synchronization primitive to use it in multiple writers and multiple readers.
 type RingBuffer struct {
 	buf         []T
 	initialSize int
