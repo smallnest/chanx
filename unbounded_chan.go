@@ -19,11 +19,15 @@ type UnboundedChan struct {
 }
 
 // Len returns len of In plus len of Out plus len of buffer.
+// It is not accurate and only for your evaluating approximate number of elements in this chan,
+// see https://github.com/smallnest/chanx/issues/7.
 func (c UnboundedChan) Len() int {
 	return len(c.In) + c.BufLen() + len(c.Out)
 }
 
 // BufLen returns len of the buffer.
+// It is not accurate and only for your evaluating approximate number of elements in this chan,
+// see https://github.com/smallnest/chanx/issues/7.
 func (c UnboundedChan) BufLen() int {
 	return int(atomic.LoadInt64(&c.bufCount))
 }
@@ -56,16 +60,24 @@ loop:
 			break loop
 		}
 
-		// out is not full
-		select {
-		case out <- val:
-			continue
-		default:
+		// make sure values' order
+		// buffer has some values
+		if atomic.LoadInt64(&ch.bufCount) > 0 {
+			ch.buffer.Write(val)
+			atomic.AddInt64(&ch.bufCount, 1)
+		} else {
+			// out is not full
+			select {
+			case out <- val:
+				continue
+			default:
+			}
+
+			// out is full
+			ch.buffer.Write(val)
+			atomic.AddInt64(&ch.bufCount, 1)
 		}
 
-		// out is full
-		ch.buffer.Write(val)
-		atomic.AddInt64(&ch.bufCount, 1)
 		for !ch.buffer.IsEmpty() {
 			select {
 			case val, ok := <-in:
