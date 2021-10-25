@@ -52,53 +52,34 @@ func NewUnboundedChanSize(initInCapacity, initOutCapacity, initBufCapacity int) 
 }
 
 func process(in, out chan T, ch *UnboundedChan) {
-	defer close(out)
-loop:
 	for {
-		val, ok := <-in
-		if !ok { // in is closed
-			break loop
-		}
-
-		// make sure values' order
-		// buffer has some values
-		if atomic.LoadInt64(&ch.bufCount) > 0 {
-			ch.buffer.Write(val)
-			atomic.AddInt64(&ch.bufCount, 1)
-		} else {
-			// out is not full
-			select {
-			case out <- val:
-				continue
-			default:
+		if ch.buffer.IsEmpty() {
+			val, unclosed := <-in
+			if !unclosed {
+				goto exit
 			}
-
-			// out is full
 			ch.buffer.Write(val)
 			atomic.AddInt64(&ch.bufCount, 1)
 		}
 
-		for !ch.buffer.IsEmpty() {
-			select {
-			case val, ok := <-in:
-				if !ok { // in is closed
-					break loop
-				}
-				ch.buffer.Write(val)
-				atomic.AddInt64(&ch.bufCount, 1)
-
-			case out <- ch.buffer.Peek():
-				ch.buffer.Pop()
-				atomic.AddInt64(&ch.bufCount, -1)
-				if ch.buffer.IsEmpty() && ch.buffer.size > ch.buffer.initialSize { // after burst
-					ch.buffer.Reset()
-					atomic.StoreInt64(&ch.bufCount, 0)
-				}
+		select {
+		case val, unclosed := <-in:
+			if !unclosed {
+				goto exit
+			}
+			ch.buffer.Write(val)
+			atomic.AddInt64(&ch.bufCount, 1)
+		case out <- ch.buffer.Peek():
+			ch.buffer.Pop()
+			atomic.AddInt64(&ch.bufCount, -1)
+			if ch.buffer.IsEmpty() && ch.buffer.size > ch.buffer.initialSize {
+				ch.buffer.Reset()
+				atomic.StoreInt64(&ch.bufCount, 0)
 			}
 		}
 	}
 
-	// drain
+exit:
 	for !ch.buffer.IsEmpty() {
 		out <- ch.buffer.Pop()
 		atomic.AddInt64(&ch.bufCount, -1)
@@ -106,4 +87,6 @@ loop:
 
 	ch.buffer.Reset()
 	atomic.StoreInt64(&ch.bufCount, 0)
+
+	close(out)
 }
