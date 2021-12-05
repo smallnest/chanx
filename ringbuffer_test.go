@@ -7,9 +7,9 @@ import (
 )
 
 func TestRingBuffer(t *testing.T) {
-	rb := NewRingBuffer(10)
+	rb := NewRingBuffer[int](10)
 	v, err := rb.Read()
-	assert.Nil(t, v)
+	assert.Equal(t, v, 0)
 	assert.Error(t, err, ErrIsEmpty)
 
 	write := 0
@@ -52,7 +52,7 @@ func TestRingBuffer(t *testing.T) {
 			break
 		}
 
-		read += v.(int)
+		read += v
 	}
 
 	assert.Equal(t, write, read)
@@ -64,9 +64,9 @@ func TestRingBuffer(t *testing.T) {
 }
 
 func TestRingBuffer_One(t *testing.T) {
-	rb := NewRingBuffer(1)
+	rb := NewRingBuffer[int](1)
 	v, err := rb.Read()
-	assert.Nil(t, v)
+	assert.Equal(t, v, 0)
 	assert.Error(t, err, ErrIsEmpty)
 
 	write := 0
@@ -109,7 +109,7 @@ func TestRingBuffer_One(t *testing.T) {
 			break
 		}
 
-		read += v.(int)
+		read += v
 	}
 
 	assert.Equal(t, write, read)
