@@ -152,7 +152,10 @@ func TestCancel(t *testing.T) {
 				select {
 				case <-ch.Done:
 					return
-				case _ = <-ch.Out:
+				case _, ok := <-ch.Out:
+					if !ok {
+						return
+					}
 				}
 			}
 		}()
