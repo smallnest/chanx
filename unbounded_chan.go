@@ -1,6 +1,7 @@
 package chanx
 
 import (
+	"sync"
 	"sync/atomic"
 )
 
@@ -9,24 +10,34 @@ import (
 // and Out is used to read, which supports multiple readers.
 // You can close the in channel if you want.
 type UnboundedChan[T any] struct {
-	bufCount int64
-	In       chan<- T       // channel for write
-	Out      <-chan T       // channel for read
-	buffer   *RingBuffer[T] // buffer
+	bufCount   int64
+	In         chan<- T // channel for write
+	Out        <-chan T // channel for read
+	Done       chan struct{}
+	cancel     chan struct{}
+	cancelOnce sync.Once
+	buffer     *RingBuffer[T] // buffer
 }
 
 // Len returns len of In plus len of Out plus len of buffer.
 // It is not accurate and only for your evaluating approximate number of elements in this chan,
 // see https://github.com/smallnest/chanx/issues/7.
-func (c UnboundedChan[T]) Len() int {
+func (c *UnboundedChan[T]) Len() int {
 	return len(c.In) + c.BufLen() + len(c.Out)
 }
 
 // BufLen returns len of the buffer.
 // It is not accurate and only for your evaluating approximate number of elements in this chan,
 // see https://github.com/smallnest/chanx/issues/7.
-func (c UnboundedChan[T]) BufLen() int {
+func (c *UnboundedChan[T]) BufLen() int {
 	return int(atomic.LoadInt64(&c.bufCount))
+}
+
+// Cancel cancel process
+func (c *UnboundedChan[T]) Cancel() {
+	c.cancelOnce.Do(func() {
+		close(c.cancel)
+	})
 }
 
 // NewUnboundedChan creates the unbounded chan.
@@ -41,20 +52,29 @@ func NewUnboundedChan[T any](initCapacity int) *UnboundedChan[T] {
 func NewUnboundedChanSize[T any](initInCapacity, initOutCapacity, initBufCapacity int) *UnboundedChan[T] {
 	in := make(chan T, initInCapacity)
 	out := make(chan T, initOutCapacity)
-	ch := UnboundedChan[T]{In: in, Out: out, buffer: NewRingBuffer[T](initBufCapacity)}
+	cancel := make(chan struct{})
+	done := make(chan struct{})
+	ch := &UnboundedChan[T]{In: in, Out: out, Done: done, cancel: cancel, buffer: NewRingBuffer[T](initBufCapacity)}
 
-	go process(in, out, &ch)
+	go process(in, out, cancel, done, ch)
 
-	return &ch
+	return ch
 }
 
-func process[T any](in, out chan T, ch *UnboundedChan[T]) {
+func process[T any](in, out chan T, cancel, done chan struct{}, ch *UnboundedChan[T]) {
+	defer close(done)
 	defer close(out)
 loop:
 	for {
-		val, ok := <-in
-		if !ok { // in is closed
+		var val T
+		var ok bool
+		select {
+		case <-cancel:
 			break loop
+		case val, ok = <-in:
+			if !ok { // in is closed
+				break loop
+			}
 		}
 
 		// make sure values' order
@@ -77,13 +97,14 @@ loop:
 
 		for !ch.buffer.IsEmpty() {
 			select {
+			case <-cancel:
+				break loop
 			case val, ok := <-in:
 				if !ok { // in is closed
 					break loop
 				}
 				ch.buffer.Write(val)
 				atomic.AddInt64(&ch.bufCount, 1)
-
 			case out <- ch.buffer.Peek():
 				ch.buffer.Pop()
 				atomic.AddInt64(&ch.bufCount, -1)
