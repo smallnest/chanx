@@ -1,6 +1,7 @@
 package chanx
 
 import (
+	"sync"
 	"sync/atomic"
 )
 
@@ -9,12 +10,13 @@ import (
 // and Out is used to read, which supports multiple readers.
 // You can close the in channel if you want.
 type UnboundedChan[T any] struct {
-	bufCount int64
-	In       chan<- T // channel for write
-	Out      <-chan T // channel for read
-	Done     chan struct{}
-	cancel   chan struct{}
-	buffer   *RingBuffer[T] // buffer
+	bufCount   int64
+	In         chan<- T // channel for write
+	Out        <-chan T // channel for read
+	Done       chan struct{}
+	cancel     chan struct{}
+	cancelOnce sync.Once
+	buffer     *RingBuffer[T] // buffer
 }
 
 // Len returns len of In plus len of Out plus len of buffer.
@@ -33,7 +35,9 @@ func (c *UnboundedChan[T]) BufLen() int {
 
 // Cancel cancel process
 func (c *UnboundedChan[T]) Cancel() {
-	close(c.cancel)
+	c.cancelOnce.Do(func() {
+		close(c.cancel)
+	})
 }
 
 // NewUnboundedChan creates the unbounded chan.
