@@ -125,3 +125,40 @@ func TestLen(t *testing.T) {
 	assert.Equal(t, 0, ch.Len())
 	assert.Equal(t, 0, ch.BufLen())
 }
+
+func TestCancel(t *testing.T) {
+	ch := NewUnboundedChan[int64](1)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-ch.Done:
+					return
+				case ch.In <- 42:
+				}
+			}
+		}()
+	}
+
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-ch.Done:
+					return
+				case _ = <-ch.Out:
+				}
+			}
+		}()
+	}
+
+	time.Sleep(time.Second)
+	ch.Cancel()
+	wg.Wait()
+}
