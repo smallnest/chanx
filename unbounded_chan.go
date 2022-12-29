@@ -1,6 +1,7 @@
 package chanx
 
 import (
+	"context"
 	"sync/atomic"
 )
 
@@ -33,74 +34,83 @@ func (c UnboundedChan[T]) BufLen() int {
 // in is used to write without blocking, which supports multiple writers.
 // and out is used to read, which supports multiple readers.
 // You can close the in channel if you want.
-func NewUnboundedChan[T any](initCapacity int) *UnboundedChan[T] {
-	return NewUnboundedChanSize[T](initCapacity, initCapacity, initCapacity)
+func NewUnboundedChan[T any](ctx context.Context, initCapacity int) *UnboundedChan[T] {
+	return NewUnboundedChanSize[T](ctx, initCapacity, initCapacity, initCapacity)
 }
 
 // NewUnboundedChanSize is like NewUnboundedChan but you can set initial capacity for In, Out, Buffer.
-func NewUnboundedChanSize[T any](initInCapacity, initOutCapacity, initBufCapacity int) *UnboundedChan[T] {
+func NewUnboundedChanSize[T any](ctx context.Context, initInCapacity, initOutCapacity, initBufCapacity int) *UnboundedChan[T] {
 	in := make(chan T, initInCapacity)
 	out := make(chan T, initOutCapacity)
 	ch := UnboundedChan[T]{In: in, Out: out, buffer: NewRingBuffer[T](initBufCapacity)}
 
-	go process(in, out, &ch)
+	go process(ctx, in, out, &ch)
 
 	return &ch
 }
 
-func process[T any](in, out chan T, ch *UnboundedChan[T]) {
+func process[T any](ctx context.Context, in, out chan T, ch *UnboundedChan[T]) {
 	defer close(out)
-loop:
-	for {
-		val, ok := <-in
-		if !ok { // in is closed
-			break loop
+	cctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	drain := func() {
+		for !ch.buffer.IsEmpty() {
+			out <- ch.buffer.Pop()
+			atomic.AddInt64(&ch.bufCount, -1)
 		}
 
-		// make sure values' order
-		// buffer has some values
-		if atomic.LoadInt64(&ch.bufCount) > 0 {
-			ch.buffer.Write(val)
-			atomic.AddInt64(&ch.bufCount, 1)
-		} else {
-			// out is not full
-			select {
-			case out <- val:
-				continue
-			default:
+		ch.buffer.Reset()
+		atomic.StoreInt64(&ch.bufCount, 0)
+	}
+	for {
+		select {
+		case <-cctx.Done():
+			return
+		case val, ok := <-in:
+			if !ok { // in is closed
+				drain()
+				return
 			}
 
-			// out is full
-			ch.buffer.Write(val)
-			atomic.AddInt64(&ch.bufCount, 1)
-		}
-
-		for !ch.buffer.IsEmpty() {
-			select {
-			case val, ok := <-in:
-				if !ok { // in is closed
-					break loop
-				}
+			// make sure values' order
+			// buffer has some values
+			if atomic.LoadInt64(&ch.bufCount) > 0 {
 				ch.buffer.Write(val)
 				atomic.AddInt64(&ch.bufCount, 1)
+			} else {
+				// out is not full
+				select {
+				case out <- val:
+					continue
+				default:
+				}
 
-			case out <- ch.buffer.Peek():
-				ch.buffer.Pop()
-				atomic.AddInt64(&ch.bufCount, -1)
-				if ch.buffer.IsEmpty() && ch.buffer.size > ch.buffer.initialSize { // after burst
-					ch.buffer.Reset()
-					atomic.StoreInt64(&ch.bufCount, 0)
+				// out is full
+				ch.buffer.Write(val)
+				atomic.AddInt64(&ch.bufCount, 1)
+			}
+
+			for !ch.buffer.IsEmpty() {
+				select {
+				case <-cctx.Done():
+					return
+				case val, ok := <-in:
+					if !ok { // in is closed
+						drain()
+						return
+					}
+					ch.buffer.Write(val)
+					atomic.AddInt64(&ch.bufCount, 1)
+
+				case out <- ch.buffer.Peek():
+					ch.buffer.Pop()
+					atomic.AddInt64(&ch.bufCount, -1)
+					if ch.buffer.IsEmpty() && ch.buffer.size > ch.buffer.initialSize { // after burst
+						ch.buffer.Reset()
+						atomic.StoreInt64(&ch.bufCount, 0)
+					}
 				}
 			}
 		}
 	}
-
-	// drain
-	for !ch.buffer.IsEmpty() {
-		out <- ch.buffer.Pop()
-		atomic.AddInt64(&ch.bufCount, -1)
-	}
-
-	ch.buffer.Reset()
-	atomic.StoreInt64(&ch.bufCount, 0)
 }
