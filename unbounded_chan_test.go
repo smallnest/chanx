@@ -1,15 +1,19 @@
 package chanx
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
 
 func TestMakeUnboundedChan(t *testing.T) {
-	ch := NewUnboundedChan[int64](100)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ch := NewUnboundedChan[int64](ctx, 100)
 
 	for i := 1; i < 200; i++ {
 		ch.In <- int64(i)
@@ -39,7 +43,9 @@ func TestMakeUnboundedChan(t *testing.T) {
 }
 
 func TestMakeUnboundedChanSize(t *testing.T) {
-	ch := NewUnboundedChanSize[int64](10, 50, 100)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ch := NewUnboundedChanSize[int64](ctx, 10, 50, 100)
 
 	for i := 1; i < 200; i++ {
 		ch.In <- int64(i)
@@ -69,12 +75,19 @@ func TestMakeUnboundedChanSize(t *testing.T) {
 }
 
 func TestLen_DataRace(t *testing.T) {
-	ch := NewUnboundedChan[int64](1)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ch := NewUnboundedChan[int64](ctx, 1)
 	stop := make(chan bool)
+	wg := &sync.WaitGroup{}
 	for i := 0; i < 100; i++ { // may tweak the number of iterations
-		go func() {
+		wg.Add(1)
+		go func(ctx context.Context) {
+			defer wg.Done()
 			for {
 				select {
+				case <-ctx.Done():
+					return
 				case <-stop:
 					return
 				default:
@@ -82,17 +95,20 @@ func TestLen_DataRace(t *testing.T) {
 					<-ch.Out
 				}
 			}
-		}()
+		}(ctx)
 	}
 
 	for i := 0; i < 10000; i++ { // may tweak the number of iterations
 		ch.Len()
 	}
 	close(stop)
+	wg.Wait()
 }
 
 func TestLen(t *testing.T) {
-	ch := NewUnboundedChanSize[int64](10, 50, 100)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ch := NewUnboundedChanSize[int64](ctx, 10, 50, 100)
 
 	for i := 1; i < 200; i++ {
 		ch.In <- int64(i)
@@ -124,4 +140,14 @@ func TestLen(t *testing.T) {
 	assert.Equal(t, 0, len(ch.Out))
 	assert.Equal(t, 0, ch.Len())
 	assert.Equal(t, 0, ch.BufLen())
+}
+
+func TestGetDataWithGoleak(t *testing.T) {
+	defer goleak.VerifyNone(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ch := NewUnboundedChanSize[int64](ctx, 10, 50, 100)
+	for i := 1; i < 200; i++ {
+		ch.In <- int64(i)
+	}
 }
