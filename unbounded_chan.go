@@ -51,8 +51,8 @@ func NewUnboundedChanSize[T any](ctx context.Context, initInCapacity, initOutCap
 
 func process[T any](ctx context.Context, in, out chan T, ch *UnboundedChan[T]) {
 	defer close(out)
-	cctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	// cctx, cancel := context.WithCancel(ctx)
+	// defer cancel()
 	drain := func() {
 		for !ch.buffer.IsEmpty() {
 			out <- ch.buffer.Pop()
@@ -64,7 +64,7 @@ func process[T any](ctx context.Context, in, out chan T, ch *UnboundedChan[T]) {
 	}
 	for {
 		select {
-		case <-cctx.Done():
+		case <-ctx.Done():
 			return
 		case val, ok := <-in:
 			if !ok { // in is closed
@@ -92,7 +92,7 @@ func process[T any](ctx context.Context, in, out chan T, ch *UnboundedChan[T]) {
 
 			for !ch.buffer.IsEmpty() {
 				select {
-				case <-cctx.Done():
+				case <-ctx.Done():
 					return
 				case val, ok := <-in:
 					if !ok { // in is closed
