@@ -51,12 +51,14 @@ func NewUnboundedChanSize[T any](ctx context.Context, initInCapacity, initOutCap
 
 func process[T any](ctx context.Context, in, out chan T, ch *UnboundedChan[T]) {
 	defer close(out)
-	// cctx, cancel := context.WithCancel(ctx)
-	// defer cancel()
 	drain := func() {
 		for !ch.buffer.IsEmpty() {
-			out <- ch.buffer.Pop()
-			atomic.AddInt64(&ch.bufCount, -1)
+			select {
+			case out <- ch.buffer.Pop():
+				atomic.AddInt64(&ch.bufCount, -1)
+			case <-ctx.Done():
+				return
+			}
 		}
 
 		ch.buffer.Reset()
