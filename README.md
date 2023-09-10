@@ -2,7 +2,7 @@
 
 Unbounded chan with ringbuffer.
 
-[![License](https://img.shields.io/:license-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![GoDoc](https://godoc.org/github.com/smallnest/chanx?status.png)](http://godoc.org/github.com/smallnest/chanx)  [![travis](https://travis-ci.org/smallnest/chanx.svg?branch=main)](https://travis-ci.org/smallnest/chanx) [![Go Report Card](https://goreportcard.com/badge/github.com/smallnest/chanx)](https://goreportcard.com/report/github.com/smallnest/chanx) [![coveralls](https://coveralls.io/repos/smallnest/chanx/badge.svg?branch=main&service=github)](https://coveralls.io/github/smallnest/chanx?branch=main) 
+[![License](https://img.shields.io/:license-MIT-blue.svg)](https://opensource.org/licenses/MIT) ![GitHub](https://img.shields.io/github/license/smallnest/chanx) ![GitHub Action](https://github.com/smallnest/chanx/actions/workflows/go.yaml/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/smallnest/chanx)](https://goreportcard.com/report/github.com/smallnest/chanx)  [![GoDoc](https://godoc.org/github.com/smallnest/chanx?status.png)](http://godoc.org/github.com/smallnest/chanx) 
 
 Refer to the below articles and issues:
 1. https://github.com/golang/go/issues/20352
@@ -14,7 +14,7 @@ Refer to the below articles and issues:
 ## Usage
 
 If you want to use it with Go 1.17.x or below, you can use `github.com/smallnest/chanx@1.0.0`.
-Since `github.com/smallnest/chanx@1.1.0`, it support Go generic.
+Since `github.com/smallnest/chanx@1.1.0`, it support Go generics.
 
 ```go
 ch := NewUnboundedChan(1000)
