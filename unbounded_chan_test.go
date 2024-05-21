@@ -151,3 +151,31 @@ func TestGetDataWithGoleak(t *testing.T) {
 		ch.In <- int64(i)
 	}
 }
+
+func BenchmarkUnboundedChanLen(b *testing.B) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ch := NewUnboundedChanSize[int64](ctx, 10, 50, 100)
+	for i := 1; i < 200; i++ {
+		ch.In <- int64(i)
+	}
+	// Benchmark the Len method
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = ch.Len()
+	}
+}
+
+func BenchmarkUnboundedBufLen(b *testing.B) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ch := NewUnboundedChanSize[int64](ctx, 10, 50, 100)
+	for i := 1; i < 200; i++ {
+		ch.In <- int64(i)
+	}
+	// Benchmark the Len method
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = ch.BufLen()
+	}
+}
