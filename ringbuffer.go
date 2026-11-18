@@ -40,6 +40,7 @@ func (r *RingBuffer[T]) Read() (T, error) {
 	}
 
 	v := r.buf[r.r]
+	r.buf[r.r] = t
 	r.r++
 	if r.r == r.size {
 		r.r = 0
