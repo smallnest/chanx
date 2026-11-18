@@ -6,6 +6,26 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestRingBufferReadReleasesReferences(t *testing.T) {
+	rb := NewRingBuffer[*int](2)
+	first, second := 1, 2
+	rb.Write(&first)
+	rb.Write(&second)
+
+	v, err := rb.Read()
+	assert.NoError(t, err)
+	assert.Same(t, &first, v)
+	assert.Nil(t, rb.buf[0], "consumed slots must release their references")
+	assert.Equal(t, 1, rb.Len())
+	assert.Same(t, &second, rb.Peek())
+
+	assert.Same(t, &second, rb.Pop())
+	assert.True(t, rb.IsEmpty())
+	for _, slot := range rb.buf {
+		assert.Nil(t, slot, "an empty buffer must not retain consumed values")
+	}
+}
+
 func TestRingBuffer(t *testing.T) {
 	rb := NewRingBuffer[int](10)
 	v, err := rb.Read()
